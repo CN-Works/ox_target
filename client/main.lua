@@ -610,58 +610,68 @@ RegisterNUICallback('select', function(data, cb)
     local zone = data[3] and nearbyZones[data[3]]
 
     ---@type OxTargetOption?
-    local option = zone and zone.options[data[2]] or options[data[1]][data[2]]
+    local option = (zone and zone.options[data[2]]) or (options[data[1]] and options[data[1]][data[2]])
 
-    if option then
-        local maxDistance = option.distance or 7
-        if currentTarget.distance and currentTarget.distance > maxDistance then
-            return
+    if not option then
+        if closeOnSelect and IsNuiFocused() then
+            state.setActive(false)
+            SetNuiFocus(false, false)
+            SetNuiFocusKeepInput(false)
         end
-
-        if option.openMenu then
-            local menuDepth = #menuHistory
-
-            if option.name == 'builtin:goback' then
-                option.menuName = option.openMenu
-                option.openMenu = menuHistory[menuDepth]
-
-                if menuDepth > 0 then
-                    menuHistory[menuDepth] = nil
-                end
-            else
-                menuHistory[menuDepth + 1] = currentMenu
-            end
-
-            menuChanged = true
-            currentMenu = option.openMenu ~= 'home' and option.openMenu or nil
-
-            options:wipe()
-
-            if currentTarget.isSelf then
-                options:setSelf()
-            elseif currentTarget.entity and currentTarget.entity > 0 and currentTarget.entityModel then
-                options:set(currentTarget.entity, currentTarget.entityType, currentTarget.entityModel)
-            end
-        end
-
-        currentTarget.zone = zone?.id
-
-        if option.onSelect then
-            option.onSelect(option.qtarget and currentTarget.entity or getResponse(option))
-        elseif option.export then
-            exports[option.resource or zone.resource][option.export](nil, getResponse(option))
-        elseif option.event then
-            TriggerEvent(option.event, getResponse(option))
-        elseif option.serverEvent then
-            TriggerServerEvent(option.serverEvent, getResponse(option, true))
-        elseif option.command then
-            ExecuteCommand(option.command)
-        end
-
-        if option.menuName == 'home' then return end
+        return
     end
 
-    if closeOnSelect and not option?.openMenu and IsNuiFocused() then
+    local maxDistance = option.distance or 7
+    if currentTarget.distance and currentTarget.distance > maxDistance then
+        return
+    end
+
+    if option.openMenu then
+        local menuDepth = #menuHistory
+
+        if option.name == 'builtin:goback' then
+            option.menuName = option.openMenu
+            option.openMenu = menuHistory[menuDepth]
+
+            if menuDepth > 0 then
+                menuHistory[menuDepth] = nil
+            end
+        else
+            menuHistory[menuDepth + 1] = currentMenu
+        end
+
+        menuChanged = true
+        currentMenu = option.openMenu ~= 'home' and option.openMenu or nil
+
+        options:wipe()
+
+        if currentTarget.isSelf then
+            options:setSelf()
+        elseif currentTarget.entity and currentTarget.entity > 0 and currentTarget.entityModel then
+            options:set(currentTarget.entity, currentTarget.entityType, currentTarget.entityModel)
+        end
+
+        return
+    end
+
+    currentTarget.zone = zone and zone.id or nil
+
+    if closeOnSelect and IsNuiFocused() then
         state.setActive(false)
+        SetNuiFocus(false, false)
+        SetNuiFocusKeepInput(false)
+        Wait(0)
+    end
+
+    if option.onSelect then
+        option.onSelect(option.qtarget and currentTarget.entity or getResponse(option))
+    elseif option.export then
+        exports[option.resource or (zone and zone.resource)][option.export](nil, getResponse(option))
+    elseif option.event then
+        TriggerEvent(option.event, getResponse(option))
+    elseif option.serverEvent then
+        TriggerServerEvent(option.serverEvent, getResponse(option, true))
+    elseif option.command then
+        ExecuteCommand(option.command)
     end
 end)
